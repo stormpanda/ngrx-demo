@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, signal } from '@angular/core';
 
 let id = 1;
 
@@ -21,27 +21,25 @@ export class CounterComponent {
   private readonly storageKey = `counter${id++}`;
   private readonly restored = parseInt(sessionStorage.getItem(this.storageKey) ?? '');
 
-  counter = this.restored || 0;
+  readonly counter = signal(this.restored || 0);
 
-  color(): string {
+  readonly color = computed(() => {
     console.log(this.storageKey, 'running');
 
-    return nthColor(this.counter);
-  }
+    return nthColor(this.counter());
+  });
 
   increment(): void {
-    this.counter = this.counter + 1;
-    this.persist();
+    this.counter.update(count => count + 1);
   }
 
   reset(): void {
-    this.counter = 0;
-    this.persist();
+    this.counter.set(0);
   }
 
-  readonly persist = () => {
+  readonly persist = effect(() => {
     console.log('persisting', this.storageKey);
 
-    sessionStorage.setItem(this.storageKey, `${this.counter}`);
-  };
+    sessionStorage.setItem(this.storageKey, `${this.counter()}`);
+  });
 }
