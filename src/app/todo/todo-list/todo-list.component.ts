@@ -23,7 +23,7 @@ export class TodoListComponent {
   readonly columns = ['done', 'content'];
 
   title = this.todoListStore.title;
-  items = this.todoListStore.items;
+  items = this.todoListStore.entities;
   editing = this.todoListStore.editing;
   addDisabled = this.todoListStore.addDisabled;
 

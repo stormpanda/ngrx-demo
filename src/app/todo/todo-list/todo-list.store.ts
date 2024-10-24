@@ -1,32 +1,30 @@
 import { computed, inject } from '@angular/core';
 import { tapResponse } from '@ngrx/operators';
 import { patchState, signalStore, withComputed, withMethods, withState } from '@ngrx/signals';
+import { addEntity, setEntities, setEntity, withEntities } from '@ngrx/signals/entities';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { firstValueFrom, switchMap, tap } from 'rxjs';
 import { TodoListItem } from '../todo.model';
 import { TodoService } from '../todo.service';
 
-export interface TodoListState {
-  id: string;
-  title: string;
-  items: TodoListItem[];
-  loading: boolean;
-  editing: string | undefined;
-}
-
-const initialState: TodoListState = {
-  id: '',
-  title: '',
-  items: [],
-  loading: false,
-  editing: undefined,
-};
-
 export const TodoListStore = signalStore(
-  withState<TodoListState>(initialState),
+  withState({
+    id: '',
+    title: '',
+    loading: false,
+    editing: '',
+  }),
+
+  // this can be used with a config object to specify the entity and collection names.
+  // this allows for multiple entity collections in the same store. if this is used,
+  // functions like addEntity, setEntity, and setEntities will require the collection
+  // second argument.
+  withEntities<TodoListItem>(),
+
   withComputed(({ loading, editing }) => ({
-    addDisabled: computed(() => loading() && editing() !== undefined),
+    addDisabled: computed(() => loading() && !!editing()),
   })),
+
   withMethods((store, todoService = inject(TodoService)) => ({
     editItem(id: string | undefined): void {
       patchState(store, { editing: id });
@@ -35,8 +33,7 @@ export const TodoListStore = signalStore(
     async addItem(): Promise<void> {
       patchState(store, { loading: true });
       const newItem = await firstValueFrom(todoService.addItem(store.id(), ''));
-      const items = [...store.items(), newItem];
-      patchState(store, { items, loading: false, editing: newItem.id });
+      patchState(store, addEntity(newItem), { loading: false, editing: newItem.id });
     },
 
     loadList: rxMethod<string>(id$ =>
@@ -45,7 +42,7 @@ export const TodoListStore = signalStore(
         switchMap(id =>
           todoService.getList(id).pipe(
             tapResponse({
-              next: list => patchState(store, list),
+              next: ({ items, ...list }) => patchState(store, { ...list }, setEntities(items)),
               error: () => {},
               finalize: () => patchState(store, { loading: false }),
             }),
@@ -57,8 +54,7 @@ export const TodoListStore = signalStore(
     async updateItem(id: string, update: Partial<TodoListItem>): Promise<void> {
       patchState(store, { loading: true });
       const updatedItem = await firstValueFrom(todoService.updateItem(store.id(), id, update));
-      const items = store.items().map(item => (item.id === updatedItem.id ? updatedItem : item));
-      patchState(store, { items, loading: false });
+      patchState(store, setEntity(updatedItem), { loading: false });
     },
   })),
 );
